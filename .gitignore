@@ -1,0 +1,7 @@
+stickers/
+venv/
+__pychache__/
+*.pyc
+*.pot
+*.log
+.idea/
