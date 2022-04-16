@@ -42,7 +42,7 @@ class Form(StatesGroup):
 @dp.message_handler(commands="start")
 async def welcome(message: types.Message):
     sti_name = random.choice(os.listdir("stickers"))
-    sti = open(f"stickers/{sti_name}","rb")
+    sti = open(f"stickers/{sti_name}", "rb")
     text = """Вас приветствует бот магазина Megastore!
 У нас вы можете увидеть ассортимент товара и его наличие в разных точках магазинов!
 
@@ -50,9 +50,22 @@ async def welcome(message: types.Message):
     markup = InlineKeyboardMarkup(row_width=2)
     products_btn = InlineKeyboardButton(text="Товары", callback_data="products")
     profile_btn = InlineKeyboardButton(text="Мой профиль", callback_data="profile")
-    markup.add(profile_btn,products_btn)
+    info_btn = InlineKeyboardButton(text="Информация о магазине", callback_data="information")
+    markup.add(profile_btn, products_btn, info_btn)
     await bot.send_sticker(chat_id=message.chat.id, sticker=sti)
     await message.answer(text=text, reply_markup=markup)
+
+@dp.callback_query_handler(lambda c: c.data == "information")
+async def show_information(call: types.callback_query):
+    message = call.message
+    await message.answer("""Наши контактные данные:
+Телефонные номера:  (996)555-309-985(whatsapp, viber, telegram), (996)500-309-985
+Сайт: 'https://megastore.kg/'
+Email: 'megastore-kg@yandex.ru'""")
+
+    await message.answer("""Адреса:
+1) Магазин MegaElectronics, Кыргызстан, г. Бишкек, ул.Горького 120
+2) Отдел MegaElectronics, ЦУМ, 4 этаж, отдел А15.""")
 
 
 @dp.callback_query_handler(lambda c: c.data == "profile")
@@ -63,9 +76,9 @@ async def show_profile_buttons(call: types.callback_query):
 Выберите действие:"""
     markup = InlineKeyboardMarkup(row_width=2)
     cart_btn = InlineKeyboardButton(text="Моя корзина", callback_data="cart")
-    back_btn  = InlineKeyboardButton(text="Назад",callback_data="back_menu")
+    back_btn = InlineKeyboardButton(text="Назад",callback_data="back_menu")
     cart_add_btn = InlineKeyboardButton(text="Добавить товар в корзину", callback_data="add_cart")
-    markup.add(cart_btn,cart_add_btn,back_btn)
+    markup.add(cart_btn, cart_add_btn, back_btn)
     await bot.edit_message_text(message_id=message.message_id, chat_id=message.chat.id,text=text, reply_markup=markup)
 
 @dp.callback_query_handler(lambda c: c.data =="add_cart")
@@ -185,8 +198,8 @@ async def show_user_cart(call: types.callback_query):
     for product in user_products:
         await message.answer(f"""
 Номер: {product[0]}
-Название: {product[1]}
-Цена: {product[3]}""")
+Название: {product[3]}
+Цена: {product[4]}""")
     await message.answer("Вы желаете удалить что-то из корзины(Да/Нет) ?")
     await Form.answer_cart_delete.set()
 
@@ -221,7 +234,7 @@ async def show_products_type(call: types.callback_query):
     hphones_btn = InlineKeyboardButton("Гарнитуры:", callback_data="hphones")
     back_btn = InlineKeyboardButton("Назад", callback_data="back_menu")
     markup.add(mouse_btn, kboard_btn, hphones_btn, back_btn)
-    await bot.edit_message_text(text="Выберите тип товаров:",
+    await bot.edit_message_text(text="Выберите категорию товаров:",
                                 chat_id=message.chat.id,
                                 message_id=message.message_id,
                                 reply_markup=markup)
@@ -230,8 +243,11 @@ async def show_products_type(call: types.callback_query):
 @dp.callback_query_handler(lambda c: c.data == "mouses")
 async def show_mouses_search_step1(call: types.callback_query):
     message = call.message
-    await bot.edit_message_text(text="""Введите название мыши:
-Если хотите вывести все мыши отправьте '*' """, chat_id=message.chat.id, message_id=message.message_id)
+    await bot.delete_message(message.chat.id, message.message_id)
+    await message.answer("Выбрана категория 'Мыши'")
+    await message.answer("У нас имеются такие топовые модели, как A4TECH, Asus, HyperX, Logitech, Razer и многие другие!")
+    await message.answer(text="""Введите название мыши:
+Если хотите вывести все мыши отправьте '*' """)
     await Form.mouse_name_all.set()
 
 
@@ -240,12 +256,16 @@ async def show_mouses_search_step2(message: types.Message, state=FSMContext):
     if message.text == "*":
         mouses = sql.mouse_manager.found_mouse_with_name("")
         for mouse in mouses:
-            await message.answer(text=f"{mouse[0]}) {mouse[1]}")
+            await message.answer(text=f"""
+ID Модели: {mouse[0]} 
+Название товара: {mouse[1]}""")
             sleep(0.1)
     else:
         mouses = sql.mouse_manager.found_mouse_with_name(message.text)
         for mouse in mouses:
-            await message.answer(text=f"{mouse[0]}) {mouse[1]}")
+            await message.answer(text=f"""
+ID модели: {mouse[0]}
+Название товара: {mouse[1]}""")
             sleep(0.1)
     await message.answer(text="""Введите id модели, чтобы узнать подробную информацию:
 (если хотите выйти в меню введите 'Меню')""")
@@ -255,7 +275,7 @@ async def show_mouses_search_step2(message: types.Message, state=FSMContext):
 @dp.message_handler(state=Form.total_mouse)
 async def show_info_mouse(message: types.Message, state=FSMContext):
     try:
-        if message.text == "Меню":
+        if message.text.lower() == "меню":
             await state.finish()
             await welcome(message)
         else:
@@ -280,8 +300,12 @@ async def show_info_mouse(message: types.Message, state=FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "kboards")
 async def show_keyboards_search_step1(call: types.callback_query):
     message = call.message
-    await bot.edit_message_text(text="""Введите название клавиатуры:
-Если хотите вывести все клавиатуры отправьте '*' """, chat_id=message.chat.id, message_id=message.message_id)
+    await bot.delete_message(message.chat.id, message.message_id)
+    await message.answer("Выбрана категория 'Клавиатуры'")
+    await message.answer(
+        "У нас имеются такие топовые модели, как HyperX, Logitech, Razer и многие другие!")
+    await message.answer(text="""Введите название клавиатуры:
+Если хотите вывести все клавиатуры отправьте '*' """)
     await Form.keyboard_name_all.set()
 
 
@@ -290,12 +314,16 @@ async def show_keyboards_search_step2(message: types.Message, state=FSMContext):
     if message.text == "*":
         keyboards = sql.keyboard_manager.found_keyboard_with_name("")
         for keyboard in keyboards:
-            await message.answer(text=f"{keyboard[0]}) {keyboard[1]}")
+            await message.answer(text=f"""
+ID модели: {keyboard[0]}
+Название Товара: {keyboard[1]}""")
             sleep(0.1)
     else:
         keyboards = sql.keyboard_manager.found_keyboard_with_name(message.text)
         for keyboard in keyboards:
-            await message.answer(text=f"{keyboard[0]}) {keyboard[1]}")
+            await message.answer(text=f"""
+ID модели: {keyboard[0]})
+Название товара: {keyboard[1]}""")
             sleep(0.1)
     await message.answer(text="""Введите id модели, чтобы узнать подробную информацию:
 (если хотите выйти в меню введите 'Меню')""")
@@ -332,8 +360,12 @@ async def show_info_keyboard(message: types.Message, state=FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "hphones")
 async def show_headphones_search_step1(call: types.callback_query):
     message = call.message
-    await bot.edit_message_text(text="""Введите название наушников:
-Если хотите вывести все наушники отправьте '*' """, chat_id=message.chat.id, message_id=message.message_id)
+    await bot.delete_message(message.chat.id, message.message_id)
+    await message.answer("Выбрана категория 'Наушники'")
+    await message.answer(
+        "У нас имеются такие топовые модели, как A4TECH, JBL, HyperX, Razer и многие другие!")
+    await message.reply(text="""Введите название наушников:
+Если хотите вывести все наушники отправьте '*' """)
     await Form.headphones_name_all.set()
 
 
@@ -342,12 +374,16 @@ async def show_headphones_search_step2(message: types.Message, state=FSMContext)
     if message.text == "*":
         headphones = sql.headphones_manager.found_headphones_with_name("")
         for headphone in headphones:
-            await message.answer(text=f"{headphone[0]}) {headphone[1]}")
+            await message.answer(text=f"""
+ID модели: {headphone[0]} 
+Название товара: {headphone[1]}""")
             sleep(0.1)
     else:
         headphones = sql.headphones_manager.found_headphones_with_name(message.text)
         for headphone in headphones:
-            await message.answer(text=f"{headphone[0]}) {headphone[1]}")
+            await message.answer(text=f"""
+ID модели: {headphone[0]}) 
+Название товара: {headphone[1]}""")
             sleep(0.1)
     await message.answer(text="""Введите id модели, чтобы узнать подробную информацию:
 (если хотите выйти в меню введите 'Меню')""")
